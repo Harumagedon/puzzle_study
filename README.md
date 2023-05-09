@@ -5,4 +5,4 @@
 ![キャプチャ画像](images/created_puyo.png)
 
 ### 02_create_prefab
-![キャプチャ画像](images/created_puyo.png)
+![キャプチャ画像](images/created_prefab.png)
