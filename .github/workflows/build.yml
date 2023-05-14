@@ -36,8 +36,9 @@ jobs:
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
-          targetPlatform: ${{ matrix.targetPlatform }}
           projectPath: ./src
+          targetPlatform: ${{ matrix.targetPlatform }}
+
 
       # Upload Build
       - name: Upload Build
