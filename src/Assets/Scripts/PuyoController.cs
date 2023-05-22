@@ -35,6 +35,8 @@ public class PuyoController : MonoBehaviour
     public void SetPuyoType(PuyoType type)
     {
         this.type = type;
+
+        my_renderer.material.color = color_table[(int)type];
     }
 
     public PuyoType GetPuyoType()
