@@ -5,6 +5,16 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
+    enum RotState
+    {
+        Up = 0,
+        Right = 1,
+        Down = 2,
+        Left = 3,
+
+        Invalid = -1
+    }
+
     [SerializeField] private PuyoController[] puyoControllers = new PuyoController[2] { default!, default! };
     [SerializeField] private BoardController boardController = default!;
 
@@ -37,7 +47,8 @@ public class PlayerController : MonoBehaviour
         position = new Vector2Int(2, 12);
 
         puyoControllers[0].SetPos(new Vector3((float)position.x, (float)position.y, 0.0f));
-        puyoControllers[1].SetPos(new Vector3((float)position.x, (float)position.y + 1.0f, 0.0f));
+        Vector2Int posChild = CalcChildPuyoPos(position, rotate);
+        puyoControllers[1].SetPos(new Vector3((float)posChild.x, (float)posChild.y, 0.0f));
     }
 
     static readonly Vector2Int[] RotateTbl = new Vector2Int[]
@@ -54,7 +65,7 @@ public class PlayerController : MonoBehaviour
     {
         if (!boardController.CanSettle(pos)) return false;
         if (!boardController.CanSettle(CalcChildPuyoPos(pos, rot))) return false;
-
+        
         return true;
     }
 
