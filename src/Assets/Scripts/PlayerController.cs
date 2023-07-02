@@ -21,16 +21,6 @@ public class PlayerController : MonoBehaviour
     private const float TRANS_TIME = 0.05f;
     private const float ROT_TIME = 0.05f;
 
-    enum RotState
-    {
-        Up = 0,
-        Right = 1,
-        Down = 2,
-        Left = 3,
-
-        Invalid = -1,
-    }
-
     private Vector2Int position;
     private RotState rotate = RotState.Up;
 
