@@ -17,7 +17,7 @@ public class PlayerController : MonoBehaviour
 
     [SerializeField] private PuyoController[] puyoControllers = new PuyoController[2] { default!, default! };
     [SerializeField] private BoardController boardController = default!;
-    LogicalInput logicalInput = new();
+    LogicalInput logicalInput = null;
 
     private const int TRANS_TIME = 3;
     private const int ROT_TIME = 3;
@@ -35,20 +35,45 @@ public class PlayerController : MonoBehaviour
     private Vector2Int lastPosition;
     private RotState lastRotate = RotState.Up;
 
-    int _fallCount = 0;
-    int _groundFrame = GROUND_FRAMES;
+    int fallCount = 0;
+    int groundFrame = GROUND_FRAMES;
 
     // Start is called before the first frame update
     private void Start()
     {
-        logicalInput.Clear();
+        gameObject.SetActive(false);
+    }
 
-        puyoControllers[0].SetPuyoType(PuyoType.Green);
-        puyoControllers[1].SetPuyoType(PuyoType.Red);
+    public void SetLogicalInput(LogicalInput reference)
+    {
+        logicalInput = reference;
+    }
+
+    public bool Spawn(PuyoType axis, PuyoType child)
+    {
+        // 初期位置に出せるか確認
+        Vector2Int _position = new(2, 12); // 初期位置
+        RotState _rotate = RotState.Up; // 最初は上向き
+        if (!CanMove(_position, _rotate)) return false;
+
+        // パラメータの初期化
+        position = lastPosition = _position;
+        rotate = lastRotate = _rotate;
+        animationController.Set(1);
+        fallCount = 0;
+        groundFrame = GROUND_FRAMES;
+
+        // ぷよをだす
+        puyoControllers[0].SetPuyoType(axis);
+        puyoControllers[1].SetPuyoType(child);
 
         puyoControllers[0].SetPos(new Vector3((float)position.x, (float)position.y, 0.0f));
         Vector2Int posChild = CalcChildPuyoPos(position, rotate);
         puyoControllers[1].SetPos(new Vector3((float)posChild.x, (float)posChild.y, 0.0f));
+
+        gameObject.SetActive(true);
+
+        return true;
     }
 
     static readonly Vector2Int[] RotateTbl = new Vector2Int[]
@@ -167,31 +192,16 @@ public class PlayerController : MonoBehaviour
         KeyCode.DownArrow, // Down
     };
 
-    void UpdateInput()
-    {
-        LogicalInput.Key inputDev = 0;
-
-        for (int i = 0; i < (int)LogicalInput.Key.MAX; i++)
-        {
-            if (Input.GetKey(KeyCodeTbl[i]))
-            {
-                inputDev |= (LogicalInput.Key)(1 << i);
-            }
-        }
-
-        logicalInput.Update(inputDev);
-    }
-
     bool Fall(bool isFast)
     {
-        _fallCount -= isFast ? FALL_COUNT_FAST_SPD : FALL_COUNT_SPD;
+        fallCount -= isFast ? FALL_COUNT_FAST_SPD : FALL_COUNT_SPD;
 
-        while (_fallCount < 0)
+        while (fallCount < 0)
         {
             if (!CanMove(position + Vector2Int.down, rotate))
             {
-                _fallCount = 0;
-                if (0 < --_groundFrame) return true;
+                fallCount = 0;
+                if (0 < --groundFrame) return true;
 
                 Settle();
                 return false;
@@ -199,7 +209,7 @@ public class PlayerController : MonoBehaviour
 
             position += Vector2Int.down;
             lastPosition += Vector2Int.down;
-            _fallCount += FALL_COUNT_UNIT;
+            fallCount += FALL_COUNT_UNIT;
         }
 
         return true;
@@ -243,11 +253,9 @@ public class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        UpdateInput();
-
         Control();
 
-        Vector3 dy = Vector3.up * (float)_fallCount / (float)FALL_COUNT_UNIT;
+        Vector3 dy = Vector3.up * (float)fallCount / (float)FALL_COUNT_UNIT;
         float animRate = animationController.GetNormalized();
         puyoControllers[0].SetPos(dy + Interpolate(position, RotState.Invalid, lastPosition, RotState.Invalid, animRate));
         puyoControllers[1].SetPos(dy + Interpolate(position, rotate, lastPosition, lastRotate, animRate));
