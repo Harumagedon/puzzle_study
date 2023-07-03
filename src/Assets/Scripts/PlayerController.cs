@@ -18,8 +18,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private PuyoController[] puyoControllers = new PuyoController[2] { default!, default! };
     [SerializeField] private BoardController boardController = default!;
 
-    private const float TRANS_TIME = 0.05f;
-    private const float ROT_TIME = 0.05f;
+    private const int TRANS_TIME = 3;
+    private const int ROT_TIME = 3;
 
     private Vector2Int position;
     private RotState rotate = RotState.Up;
@@ -55,7 +55,7 @@ public class PlayerController : MonoBehaviour
     {
         if (!boardController.CanSettle(pos)) return false;
         if (!boardController.CanSettle(CalcChildPuyoPos(pos, rot))) return false;
-        
+
         return true;
     }
 
@@ -69,7 +69,7 @@ public class PlayerController : MonoBehaviour
         return true;
     }
 
-    private void SetTransition(Vector2Int pos, RotState rotState, float transTime)
+    private void SetTransition(Vector2Int pos, RotState rotState, int transTime)
     {
         lastPosition = position;
         lastRotate = rotate;
@@ -169,7 +169,7 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        if (!animationController.Update(Time.deltaTime)) // アニメ中はキー入力を受け付けない
+        if (!animationController.Update()) // アニメ中はキー入力を受け付けない
         {
             Control();
         }
