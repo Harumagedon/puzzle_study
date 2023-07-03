@@ -17,24 +17,34 @@ public class PlayerController : MonoBehaviour
 
     [SerializeField] private PuyoController[] puyoControllers = new PuyoController[2] { default!, default! };
     [SerializeField] private BoardController boardController = default!;
+    LogicalInput logicalInput = new();
 
     private const int TRANS_TIME = 3;
     private const int ROT_TIME = 3;
 
-    private Vector2Int position;
+    const int FALL_COUNT_UNIT = 120;
+    const int FALL_COUNT_SPD = 10;
+    const int FALL_COUNT_FAST_SPD = 20;
+    const int GROUND_FRAMES = 50;
+
+    Vector2Int position = new Vector2Int(2, 12);
     private RotState rotate = RotState.Up;
 
     private AnimationController animationController = new AnimationController();
+
     private Vector2Int lastPosition;
     private RotState lastRotate = RotState.Up;
+
+    int _fallCount = 0;
+    int _groundFrame = GROUND_FRAMES;
 
     // Start is called before the first frame update
     private void Start()
     {
+        logicalInput.Clear();
+
         puyoControllers[0].SetPuyoType(PuyoType.Green);
         puyoControllers[1].SetPuyoType(PuyoType.Red);
-
-        position = new Vector2Int(2, 12);
 
         puyoControllers[0].SetPos(new Vector3((float)position.x, (float)position.y, 0.0f));
         Vector2Int posChild = CalcChildPuyoPos(position, rotate);
@@ -115,8 +125,23 @@ public class PlayerController : MonoBehaviour
         return true;
     }
 
+    void Settle()
+    {
+        // 直接接地
+        bool isSet0 = boardController.Settle(position,
+            (int)puyoControllers[0].GetPuyoType());
+        Debug.Assert(isSet0); // 置いたのは空いていた場所のはず
+
+        bool isSet1 = boardController.Settle(CalcChildPuyoPos(position, rotate),
+            (int)puyoControllers[1].GetPuyoType());
+        Debug.Assert(isSet1); // 置いたのは空いていた場所のはず
+
+        gameObject.SetActive(false);
+    }
+
     void QuickDrop()
     {
+        // 落ちれる一番下まで落ちる
         Vector2Int pos = position;
         do
         {
@@ -124,59 +149,108 @@ public class PlayerController : MonoBehaviour
         }
         while (CanMove(pos, rotate));
 
-        pos -= Vector2Int.down;
+        pos -= Vector2Int.down; // 一つ上の場所（最後に置けた場所）に戻す
 
         position = pos;
 
-        bool isSet0 = boardController.Settle(position,
-            (int)puyoControllers[0].GetPuyoType());
-        Debug.Assert(isSet0);
+        Settle();
+    }
 
-        bool isSet1 = boardController.Settle(CalcChildPuyoPos(position, rotate),
-            (int)puyoControllers[1].GetPuyoType());
-        Debug.Assert(isSet1);
 
-        gameObject.SetActive(false);
+    static readonly KeyCode[] KeyCodeTbl = new KeyCode[(int)LogicalInput.Key.MAX]
+    {
+        KeyCode.RightArrow, // Right
+        KeyCode.LeftArrow, // Left
+        KeyCode.X, // RotR
+        KeyCode.Z, // RotL
+        KeyCode.UpArrow, // QuickDrop
+        KeyCode.DownArrow, // Down
+    };
+
+    void UpdateInput()
+    {
+        LogicalInput.Key inputDev = 0;
+
+        for (int i = 0; i < (int)LogicalInput.Key.MAX; i++)
+        {
+            if (Input.GetKey(KeyCodeTbl[i]))
+            {
+                inputDev |= (LogicalInput.Key)(1 << i);
+            }
+        }
+
+        logicalInput.Update(inputDev);
+    }
+
+    bool Fall(bool isFast)
+    {
+        _fallCount -= isFast ? FALL_COUNT_FAST_SPD : FALL_COUNT_SPD;
+
+        while (_fallCount < 0)
+        {
+            if (!CanMove(position + Vector2Int.down, rotate))
+            {
+                _fallCount = 0;
+                if (0 < --_groundFrame) return true;
+
+                Settle();
+                return false;
+            }
+
+            position += Vector2Int.down;
+            lastPosition += Vector2Int.down;
+            _fallCount += FALL_COUNT_UNIT;
+        }
+
+        return true;
     }
 
     void Control()
     {
-        if (Input.GetKeyDown(KeyCode.RightArrow))
+        if (!Fall(logicalInput.IsRaw(LogicalInput.Key.Down))) return;
+
+        if (animationController.Update()) return;
+
+        // 平行移動のキー入力取得
+        if (logicalInput.IsRepeat(LogicalInput.Key.Right))
         {
             if (Translate(true)) return;
         }
 
-        if (Input.GetKeyDown(KeyCode.LeftArrow))
+        if (logicalInput.IsRepeat(LogicalInput.Key.Left))
         {
             if (Translate(false)) return;
         }
 
-        if (Input.GetKeyDown(KeyCode.X))
+        // 回転のキー入力取得
+        if (logicalInput.IsTrigger(LogicalInput.Key.RotR)) // 右回転
         {
             if (Rotate(true)) return;
         }
 
-        if (Input.GetKeyDown(KeyCode.Z))
+        if (logicalInput.IsTrigger(LogicalInput.Key.RotL)) // 左回転
         {
             if (Rotate(false)) return;
         }
 
-        if (Input.GetKey(KeyCode.UpArrow))
+        // クイックドロップのキー入力取得
+        if (logicalInput.IsRelease(LogicalInput.Key.QuickDrop))
         {
             QuickDrop();
         }
     }
 
-    private void Update()
-    {
-        if (!animationController.Update()) // アニメ中はキー入力を受け付けない
-        {
-            Control();
-        }
 
+    private void FixedUpdate()
+    {
+        UpdateInput();
+
+        Control();
+
+        Vector3 dy = Vector3.up * (float)_fallCount / (float)FALL_COUNT_UNIT;
         float animRate = animationController.GetNormalized();
-        puyoControllers[0].SetPos(Interpolate(position, RotState.Invalid, lastPosition, RotState.Invalid, animRate));
-        puyoControllers[1].SetPos(Interpolate(position, rotate, lastPosition, lastRotate, animRate));
+        puyoControllers[0].SetPos(dy + Interpolate(position, RotState.Invalid, lastPosition, RotState.Invalid, animRate));
+        puyoControllers[1].SetPos(dy + Interpolate(position, rotate, lastPosition, lastRotate, animRate));
     }
 
     static Vector3 Interpolate(Vector2Int pos, RotState rot, Vector2Int posLast, RotState rotLast, float rate)
